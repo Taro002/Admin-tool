@@ -1,0 +1,169 @@
+@echo off
+chcp 65001 >nul
+setlocal EnableDelayedExpansion
+
+:: ===== CONFIG =====
+set LOGFILE=%~dp0admin_log.txt
+
+:: ===== ADMIN CHECK =====
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Restarting with admin rights...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit
+)
+
+:: ===== PASSWORD =====
+cls
+echo ================================
+echo        ADMIN ACCESS
+echo ================================
+set /p pass=Password:
+
+if "%pass%"=="" (
+    echo Empty password refused.
+    timeout /t 2 >nul
+    exit
+)
+
+echo [%date% %time%] LOGIN OK >> "%LOGFILE%"
+
+:: ===== MENU =====
+:menu
+cls
+echo ╔══════════════════════════════╗
+echo ║        ADMIN TOOL            ║
+echo ╠══════════════════════════════╣
+echo ║ 1. System info               ║
+echo ║ 2. List processes            ║
+echo ║ 3. Kill process              ║
+echo ║ 4. Users                     ║
+echo ║ 5. Network                   ║
+echo ║ 6. Services                  ║
+echo ║ 7. Clean temp                ║
+echo ║ 8. Repair Windows            ║
+echo ║ 9. Disk tools (DANGER)       ║
+echo ║ 0. Exit                      ║
+echo ╚══════════════════════════════╝
+set /p choice=Choice: 
+
+if "%choice%"=="1" goto info
+if "%choice%"=="2" goto proc
+if "%choice%"=="3" goto kill
+if "%choice%"=="4" goto user
+if "%choice%"=="5" goto net
+if "%choice%"=="6" goto svc
+if "%choice%"=="7" goto clean
+if "%choice%"=="8" goto repair
+if "%choice%"=="9" goto disk
+if "%choice%"=="0" goto exit
+goto menu
+
+:info
+cls
+systeminfo
+echo [%date% %time%] SYSTEM INFO >> "%LOGFILE%"
+pause
+goto menu
+
+:proc
+cls
+tasklist
+echo [%date% %time%] PROCESS LIST >> "%LOGFILE%"
+pause
+goto menu
+
+:kill
+cls
+set /p pname=Process name (.exe): 
+if "%pname%"=="" goto menu
+tasklist | find /i "%pname%" >nul
+if errorlevel 1 (
+    echo Process not found.
+    pause
+    goto menu
+)
+taskkill /f /im "%pname%"
+echo [%date% %time%] KILL %pname% >> "%LOGFILE%"
+pause
+goto menu
+
+:user
+cls
+net user
+echo [%date% %time%] USER LIST >> "%LOGFILE%"
+pause
+goto menu
+
+:net
+cls
+ipconfig /all
+echo [%date% %time%] NETWORK INFO >> "%LOGFILE%"
+pause
+goto menu
+
+:svc
+cls
+sc query
+echo [%date% %time%] SERVICE QUERY >> "%LOGFILE%"
+pause
+goto menu
+
+:clean
+cls
+echo Cleaning temp files...
+del /s /q "%temp%\*" >nul 2>&1
+del /s /q "C:\Windows\Temp\*" >nul 2>&1
+echo Done.
+echo [%date% %time%] TEMP CLEAN >> "%LOGFILE%"
+pause
+goto menu
+
+:repair
+cls
+echo Running system repair (this may take time)...
+sfc /scannow
+dism /online /cleanup-image /restorehealth
+echo [%date% %time%] SYSTEM REPAIR >> "%LOGFILE%"
+pause
+goto menu
+
+:disk
+cls
+echo ================================
+echo      DISK TOOLS - WARNING
+echo ================================
+echo This can ERASE DATA permanently.
+echo Type YES to continue:
+set /p confirm=>
+
+if not "%confirm%"=="YES" goto menu
+
+echo 1. List disks
+echo 2. Wipe disk (FULL ERASE)
+echo 0. Back
+set /p d=Choice: 
+
+if "%d%"=="1" (
+    echo list disk | diskpart
+    echo [%date% %time%] DISK LIST >> "%LOGFILE%"
+)
+
+if "%d%"=="2" (
+    echo LAST WARNING. Type ERASE to confirm:
+    set /p final=>
+    if not "%final%"=="ERASE" goto menu
+    set /p n=Disk number:
+    echo select disk %n% > dp.txt
+    echo clean >> dp.txt
+    diskpart /s dp.txt
+    del dp.txt
+    echo [%date% %time%] DISK %n% WIPED >> "%LOGFILE%"
+)
+
+pause
+goto menu
+
+:exit
+echo [%date% %time%] EXIT >> "%LOGFILE%"
+exit
